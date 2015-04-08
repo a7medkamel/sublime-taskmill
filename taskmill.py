@@ -21,10 +21,11 @@ def is_ST3():
     ''' check if ST3 based on python version '''
     return sys.version_info >= (3, 0)
 
-def plugin_loaded():
-    settings.loaded_settings = sublime.load_settings('TaskMill.sublime-settings')
-    settings.get = settings.loaded_settings.get
-    settings.set = settings.loaded_settings.set
+# def plugin_loaded():
+    # config = sublime.load_settings('TaskMill.sublime-settings')
+    # settings.loaded_settings = sublime.load_settings('TaskMill.sublime-settings')
+    # settings.get = settings.loaded_settings.get
+    # settings.set = settings.loaded_settings.set
 
 class TaskmillCommand(sublime_plugin.TextCommand):
     _pythonVersion = sys.version_info[0]
@@ -36,12 +37,15 @@ class TaskmillCommand(sublime_plugin.TextCommand):
             else:
                 self.output_view = self.window.get_output_panel("taskmill")
     def run(self, edit):
+        if not hasattr(self, 'config'):
+            self.config = sublime.load_settings('TaskMill.sublime-settings')
+
         self.window = self.view.window()
         self.edit = edit
 
         self.init_panel()
 
-        search_url = settings.get("url") + "/script/search"
+        search_url = self.config.get("url") + "/script/search"
 
         res = urllib2.urlopen(search_url).read()
 
@@ -65,10 +69,10 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                 '/' + i['git']['repository']['name'] + \
                 '/exec/' + i['git']['branch'] + i['git']['path']
             # path = re.sub(r'^(\w+?)/(\w+?)/', r'/\1/\2/exec/', item)
-            url = settings.get("url") + exe
+            url = self.config.get("url") + exe
             data = selectionText
 
-            access_token = settings.get('access_token')
+            access_token = self.config.get('access_token')
             headers = { 'Content-type': 'text/plain' }
             if access_token:
                 headers['Authorization'] = 'Bearer ' + access_token
@@ -81,9 +85,6 @@ class TaskmillCommand(sublime_plugin.TextCommand):
 
             _type = info.getheader('$type')
             _ctype = info.getheader('content-type')
-
-            print(_type)
-            print(_ctype)
 
             if not _ctype:
                 _ctype = ''
