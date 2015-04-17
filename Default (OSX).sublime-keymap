@@ -1,5 +1,5 @@
 [
     {
-        "keys": ["super+shift+k"], "command": "taskmill"
+        "keys": ["super+shift+t"], "command": "taskmill"
     }
 ]
