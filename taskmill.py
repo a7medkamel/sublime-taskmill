@@ -61,7 +61,6 @@ class TaskmillCommand(sublime_plugin.TextCommand):
 
         region1 = sel[0]
         selectionText = self.view.substr(region1)
-        # print(selectionText)
 
         if not value < 0:
             i = self.search_res[value]
@@ -143,7 +142,6 @@ class TaskmillCommand(sublime_plugin.TextCommand):
 
         tempFile.close()
 
-        print(tempFile.name)
         return tempFile.name
 
     def get_path(self, i):
