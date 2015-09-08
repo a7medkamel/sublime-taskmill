@@ -5,12 +5,22 @@ import os
 import socket
 import sys
 import re
-import urllib2
+# import urllib2
 import json
 import tempfile
 import webbrowser
 
-import urlparse
+# import urlparse
+
+try:
+    import urllib.request as urllib2
+except ImportError:
+    import urllib2
+
+try:
+    import urllib.parse as urlparse
+except ImportError:
+    import urlparse
 
 PY3 = sys.version > '3'
 
@@ -67,10 +77,18 @@ class TaskmillCommand(sublime_plugin.TextCommand):
 
         res = urllib2.urlopen(search_url).read()
 
-        obj = json.loads(res);
+        if is_ST3():
+            res_str = res.decode()
+        else:
+            res_str = res
+
+        obj = json.loads(res_str);
 
         self.search_res = obj
         self.choose = map(self.get_path, obj)
+
+        if is_ST3():
+            self.choose = list(self.choose)
 
         self.window.show_quick_panel(self.choose, self.on_done)
 
@@ -99,6 +117,9 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                 headers['Authorization'] = 'Bearer ' + access_token
 
             # url = "http://localhost:8787/fu"
+            if is_ST3():
+                data = data.encode('utf-8')
+
             req = urllib2.Request(url, data=data, headers=headers)
             try:
                 #and this is the magic. Create a HTTPHandler object and put its debug level to 1
@@ -116,8 +137,12 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                 stream = res.read()
                 res.close()
 
-                _type = info.getheader('$type')
-                _ctype = info.getheader('content-type')
+                if is_ST3():
+                    _type = res.getheader('$type')
+                    _ctype = res.getheader('content-type')
+                else:
+                    _type = info.getheader('$type')
+                    _ctype = info.getheader('content-type')
 
                 if not _ctype:
                     _ctype = ''
@@ -132,15 +157,17 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                 else:
                     txt = stream.decode('utf-8')
                     if _type == 'transform':
-                        # self.view.run_command('insert_my_text', { 'args' : { 'text' : txt }})
-                        for region in self.view.sel():
-                            if not region.empty():
-                                # print txt
-                                # Replace the selection with transformed text
-                                self.view.replace(self.edit, region, txt)
+                        self.view.run_command('insert', { 'characters' : txt })
+                        # for region in self.view.sel():
+                        #     if not region.empty():
+                        #         # print txt
+                        #         # Replace the selection with transformed text
+                        #         self.view.replace(self.edit, region, txt)
                     else:
-                        for region in self.view.sel():
-                            self.view.insert(self.edit, region.end(), '\n' + txt + '\n')
+                        txt = '\n' + txt + '\n'
+                        self.view.run_command('insert', { 'characters' : txt })
+                        # for region in self.view.sel():
+                            # self.view.insert(self.edit, region.end(), '\n' + txt + '\n')
                             # if not region.empty():
                                 # Replace the selection with transformed text
                                 # self.view.insert(self.edit, region.end(), '\n' + txt + '\n')
@@ -151,12 +178,12 @@ class TaskmillCommand(sublime_plugin.TextCommand):
             #     else:
             #         # reraise the original error
             #         raise
-            except urllib2.URLError, e:
+            except urllib2.URLError:
                 # raise MyException("There was an error: %r" % e)
-                print e
-            except socket.timeout, e:
+                print(sys.exc_info()[0])
+            except socket.timeout:
                 # For Python 2.7
-                print e
+                print(sys.exc_info()[0])
                 # raise MyException("There was an error: %r" % e)
 
 
@@ -202,3 +229,10 @@ class TaskmillCommand(sublime_plugin.TextCommand):
             "/" + i['git']['repository']['name'] + \
             "/" + i['git']['branch'] + i['git']['path']
         return [ name, path ]
+
+# class InsertCommand(sublime_plugin.TextCommand):
+#     def run(self, edit, text):
+#         print(text)
+#         for region in self.view.sel():
+#             if not region.empty():
+#                 self.view.replace(self.edit, region, text)
