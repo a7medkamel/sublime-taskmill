@@ -164,7 +164,8 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                         #         # Replace the selection with transformed text
                         #         self.view.replace(self.edit, region, txt)
                     else:
-                        txt = '\n' + txt + '\n'
+                        if '\n' in txt:
+                            txt = '\n' + txt + '\n'
                         self.view.run_command('insert', { 'characters' : txt })
                         # for region in self.view.sel():
                             # self.view.insert(self.edit, region.end(), '\n' + txt + '\n')
