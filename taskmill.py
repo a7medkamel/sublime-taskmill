@@ -101,13 +101,6 @@ class TaskmillCommand(sublime_plugin.TextCommand):
         if not value < 0:
             i = self.search_res[value]
 
-            # exe = url_path_join(i['git']['owner']['login'], i['git']['repository']['name'], 'exec', i['git']['branch'], i['git']['path'])
-            # exe = '/' + i['git']['owner']['login'] + \
-            #     '/' + i['git']['repository']['name'] + \
-            #     '/exec/' + i['git']['branch'] + i['git']['path']
-
-            # path = re.sub(r'^(\w+?)/(\w+?)/', r'/\1/\2/exec/', item)
-            # url = self.config.get("url") + exe
             url = url_path_join(self.config.get("url"), i['git']['owner']['login'], i['git']['repository']['name'], 'exec', i['git']['branch'], i['git']['path'])
             data = selectionText
 
@@ -147,7 +140,6 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                 if not _ctype:
                     _ctype = ''
 
-                # print _ctype
                 if re.search('text/html.*', _ctype):
                     self.open(stream, '.html', False)
                 elif _ctype == 'application/pdf':
@@ -156,22 +148,19 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                     self.open(stream, '.mp3', True)
                 else:
                     txt = stream.decode('utf-8')
+                    # todo if transform then replace content; otherwise insert below
                     if _type == 'transform':
-                        self.view.run_command('insert', { 'characters' : txt })
-                        # for region in self.view.sel():
-                        #     if not region.empty():
-                        #         # print txt
-                        #         # Replace the selection with transformed text
-                        #         self.view.replace(self.edit, region, txt)
+                        if is_ST3():
+                            self.view.run_command('insert_snippet', { 'contents' : txt })
+                        else:
+                            self.view.run_command('insert', { 'characters' : txt })
                     else:
                         if '\n' in txt:
                             txt = '\n' + txt + '\n'
-                        self.view.run_command('insert', { 'characters' : txt })
-                        # for region in self.view.sel():
-                            # self.view.insert(self.edit, region.end(), '\n' + txt + '\n')
-                            # if not region.empty():
-                                # Replace the selection with transformed text
-                                # self.view.insert(self.edit, region.end(), '\n' + txt + '\n')
+                        if is_ST3():
+                            self.view.run_command('insert_snippet', { 'contents' : txt })
+                        else:
+                            self.view.run_command('insert', { 'characters' : txt })
             # except urllib2.URLError, e:
             #     # For Python 2.6
             #     if isinstance(e.reason, socket.timeout):
@@ -207,6 +196,9 @@ class TaskmillCommand(sublime_plugin.TextCommand):
         #
         # Create a temporary file to hold our contents
         #
+        if is_ST3():
+            binary = True
+
         if binary:
             mode = 'wb'
         else:
@@ -226,14 +218,8 @@ class TaskmillCommand(sublime_plugin.TextCommand):
 
     def get_path(self, i):
         name = i['git']['path']
-        path = i['git']['owner']['login'] + \
-            "/" + i['git']['repository']['name'] + \
-            "/" + i['git']['branch'] + i['git']['path']
+        # path = i['git']['owner']['login'] + \
+        #     "/" + i['git']['repository']['name'] + \
+        #     "/" + i['git']['branch'] + i['git']['path']
+        path = url_path_join(i['git']['owner']['login'], i['git']['repository']['name'], i['git']['branch'], i['git']['path'])
         return [ name, path ]
-
-# class InsertCommand(sublime_plugin.TextCommand):
-#     def run(self, edit, text):
-#         print(text)
-#         for region in self.view.sel():
-#             if not region.empty():
-#                 self.view.replace(self.edit, region, text)
