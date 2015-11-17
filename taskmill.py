@@ -146,6 +146,12 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                     self.open(stream, '.pdf', True)
                 elif _ctype == 'audio/mpeg':
                     self.open(stream, '.mp3', True)
+                elif _ctype == 'image/png':
+                    self.open(stream, '.png', True)
+                elif _ctype == 'image/jp*':
+                    self.open(stream, '.jpeg', True)
+                elif _ctype == 'image/gif':
+                    self.open(stream, '.gif', True)
                 else:
                     txt = stream.decode('utf-8')
                     # todo if transform then replace content; otherwise insert below
