@@ -157,14 +157,14 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                     # todo if transform then replace content; otherwise insert below
                     if _type == 'transform':
                         if is_ST3():
-                            self.view.run_command('insert_snippet', { 'contents' : txt })
+                            self.view.run_command('append', { 'characters' : txt })
                         else:
                             self.view.run_command('insert', { 'characters' : txt })
                     else:
                         if '\n' in txt:
                             txt = '\n' + txt + '\n'
                         if is_ST3():
-                            self.view.run_command('insert_snippet', { 'contents' : txt })
+                            self.view.run_command('append', { 'characters' : txt })
                         else:
                             self.view.run_command('insert', { 'characters' : txt })
             # except urllib2.URLError, e:
