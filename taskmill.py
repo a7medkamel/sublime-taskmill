@@ -93,15 +93,15 @@ class TaskmillCommand(sublime_plugin.TextCommand):
         self.window.show_quick_panel(self.choose, self.on_done)
 
     def on_done(self, value):
-        sel = self.view.sel()
-
-        region1 = sel[0]
-        selectionText = self.view.substr(region1)
-
         if not value < 0:
+            sel = self.view.sel()
+
+            region1 = sel[0]
+            selectionText = self.view.substr(region1)
+
             i = self.search_res[value]
 
-            url = url_path_join(self.config.get("url"), i['git']['owner']['login'], i['git']['repository']['name'], 'exec', i['git']['branch'], i['git']['path'])
+            url = url_path_join(self.config.get("url"), i['git']['owner']['login'], i['git']['repository']['name'], 'run', i['git']['branch'], i['git']['path'])
             data = selectionText
 
             access_token = self.config.get('access_token')
@@ -181,7 +181,6 @@ class TaskmillCommand(sublime_plugin.TextCommand):
                 # For Python 2.7
                 print(sys.exc_info()[0])
                 # raise MyException("There was an error: %r" % e)
-
 
     def open(self, stream, ext, binary):
         fileToOpen = self.normalizePath(self.saveInTempFile(stream, ext, binary))
