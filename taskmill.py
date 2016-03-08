@@ -1,69 +1,22 @@
 import sublime
 import sublime_plugin
 
-import os
-import socket
 import sys
-import re
-# import urllib2
-import json
 import tempfile
 import webbrowser
 
-# import urlparse
+import requests
+import mimetypes
 
-try:
-    import urllib.request as urllib2
-except ImportError:
-    import urllib2
-
-try:
-    import urllib.parse as urlparse
-except ImportError:
-    import urlparse
-
-PY3 = sys.version > '3'
-
-if PY3:
-    from .settings import *
-else:
-    from settings import *
-
-def is_ST3():
-    ''' check if ST3 based on python version '''
-    return sys.version_info >= (3, 0)
-
-def url_path_join(*parts):
-    """Normalize url parts and join them with a slash."""
-    schemes, netlocs, paths, queries, fragments = zip(*(urlparse.urlsplit(part) for part in parts))
-    scheme = first(schemes)
-    netloc = first(netlocs)
-    path = '/'.join(x.strip('/') for x in paths if x)
-    query = first(queries)
-    fragment = first(fragments)
-    return urlparse.urlunsplit((scheme, netloc, path, query, fragment))
-
-def first(sequence, default=''):
-    return next((x for x in sequence if x), default)
-
-# def plugin_loaded():
-    # config = sublime.load_settings('TaskMill.sublime-settings')
-    # settings.loaded_settings = sublime.load_settings('TaskMill.sublime-settings')
-    # settings.get = settings.loaded_settings.get
-    # settings.set = settings.loaded_settings.set
-
-# https://github.com/braindamageinc/SublimeHttpRequester/blob/master/http_requester.py
-FAKE_CURL_UA = "curl/7.21.0 (i486-pc-linux-gnu) libcurl/7.21.0 OpenSSL/0.9.8o zlib/1.2.3.4 libidn/1.15 libssh2/1.2.6"
+# todo make requests async
 
 class TaskmillCommand(sublime_plugin.TextCommand):
     _pythonVersion = sys.version_info[0]
 
     def init_panel(self):
         if not hasattr(self, 'output_view'):
-            if is_ST3():
-                self.output_view = self.window.create_output_panel("taskmill")
-            else:
-                self.output_view = self.window.get_output_panel("taskmill")
+            self.output_view = self.window.create_output_panel("taskmill")
+
     def run(self, edit):
         if not hasattr(self, 'config'):
             self.config = sublime.load_settings('TaskMill.sublime-settings')
@@ -75,20 +28,10 @@ class TaskmillCommand(sublime_plugin.TextCommand):
 
         search_url = self.config.get("url") + "/script/search"
 
-        res = urllib2.urlopen(search_url).read()
+        req = requests.get(search_url, timeout=(2, 10))
 
-        if is_ST3():
-            res_str = res.decode()
-        else:
-            res_str = res
-
-        obj = json.loads(res_str);
-
-        self.search_res = obj
-        self.choose = map(self.get_path, obj)
-
-        if is_ST3():
-            self.choose = list(self.choose)
+        self.search_res = req.json()
+        self.choose = list(map(lambda i: [i['title'], i['html_url']], self.search_res))
 
         self.window.show_quick_panel(self.choose, self.on_done)
 
@@ -101,89 +44,33 @@ class TaskmillCommand(sublime_plugin.TextCommand):
 
             i = self.search_res[value]
 
-            url = url_path_join(self.config.get("url"), i['git']['owner']['login'], i['git']['repository']['name'], 'run', i['git']['branch'], i['git']['path'])
             data = selectionText
 
             access_token = self.config.get('access_token')
-            headers = { 'Content-Type': 'text/plain', "User-Agent": FAKE_CURL_UA, "Accept": "*/*" }
+            headers = { 'Content-Type': 'text/plain', "Accept": "*/*" }
             if access_token:
                 headers['Authorization'] = 'Bearer ' + access_token
 
-            # url = "http://localhost:8787/fu"
-            if is_ST3():
-                data = data.encode('utf-8')
+            req = requests.get(i['run_url'], data=data, headers=headers, timeout=(2, None))
 
-            req = urllib2.Request(url, data=data, headers=headers)
-            try:
-                #and this is the magic. Create a HTTPHandler object and put its debug level to 1
-                # httpHandler = urllib2.HTTPSHandler()
-                # httpHandler.set_http_debuglevel(1)
+            binary = req.encoding == None
 
-                #Instead of using urllib2.urlopen, create an opener, and pass the HTTPHandler
-                #and any other handlers... to it.
-                # opener = urllib2.build_opener(httpHandler)
+            if binary:
+                self.open(req)
+            else:
+                txt = req.text
 
-                # res = opener.open(req, timeout = 10)
-                res = urllib2.urlopen(req, timeout = 15)
-                info = res.info()
-
-                stream = res.read()
-                res.close()
-
-                if is_ST3():
-                    _type = res.getheader('$type')
-                    _ctype = res.getheader('content-type')
+                _type = req.headers.get('$type')
+                print(_type)
+                if _type == 'transform':
+                    self.view.run_command('insert', { 'characters' : txt })
                 else:
-                    _type = info.getheader('$type')
-                    _ctype = info.getheader('content-type')
-
-                if not _ctype:
-                    _ctype = ''
-
-                if re.search('text/html.*', _ctype):
-                    self.open(stream, '.html', False)
-                elif _ctype == 'application/pdf':
-                    self.open(stream, '.pdf', True)
-                elif _ctype == 'audio/mpeg':
-                    self.open(stream, '.mp3', True)
-                elif _ctype == 'image/png':
-                    self.open(stream, '.png', True)
-                elif _ctype == 'image/jp*':
-                    self.open(stream, '.jpeg', True)
-                elif _ctype == 'image/gif':
-                    self.open(stream, '.gif', True)
-                else:
-                    txt = stream.decode('utf-8')
-                    # todo if transform then replace content; otherwise insert below
-                    if _type == 'transform':
-                        if is_ST3():
-                            self.view.run_command('append', { 'characters' : txt })
-                        else:
-                            self.view.run_command('insert', { 'characters' : txt })
-                    else:
-                        if '\n' in txt:
-                            txt = '\n' + txt + '\n'
-                        if is_ST3():
-                            self.view.run_command('append', { 'characters' : txt })
-                        else:
-                            self.view.run_command('insert', { 'characters' : txt })
-            # except urllib2.URLError, e:
-            #     # For Python 2.6
-            #     if isinstance(e.reason, socket.timeout):
-            #         raise MyException("There was an error: %r" % e)
-            #     else:
-            #         # reraise the original error
-            #         raise
-            except urllib2.URLError:
-                # raise MyException("There was an error: %r" % e)
-                print(sys.exc_info()[0])
-            except socket.timeout:
-                # For Python 2.7
-                print(sys.exc_info()[0])
-                # raise MyException("There was an error: %r" % e)
-
-    def open(self, stream, ext, binary):
-        fileToOpen = self.normalizePath(self.saveInTempFile(stream, ext, binary))
+                    if '\n' in txt:
+                        txt = '\n' + txt + '\n'
+                    self.view.run_command('append', { 'characters' : txt })
+        
+    def open(self, req):
+        fileToOpen = self.normalizePath(self.saveInTempFile(req))
 
         ctrl = webbrowser.get();
         if self._pythonVersion < 3:
@@ -197,34 +84,27 @@ class TaskmillCommand(sublime_plugin.TextCommand):
 
         return fileToOpen
 
-    def saveInTempFile(self, stream, ext, binary):
+    def saveInTempFile(self, req):
         #
         # Create a temporary file to hold our contents
         #
-        if is_ST3():
-            binary = True
+        # if is_ST3():
+        binary = req.encoding == None
+        # binary = True
 
         if binary:
             mode = 'wb'
         else:
             mode = 'w'
 
+        ext = mimetypes.guess_extension(req.headers.get('content-type'), strict=True);
+        print(ext);
         tempFile = tempfile.NamedTemporaryFile(suffix = ext, delete = False, mode = mode)
 
-        if binary:
-            tempFile.write(stream)
-        else:
-            txt = stream.decode('utf-8')
-            tempFile.write(txt.encode("utf-8"))
+        with tempFile as fd:
+            for chunk in req.iter_content(1024):
+                fd.write(chunk)
 
         tempFile.close()
 
         return tempFile.name
-
-    def get_path(self, i):
-        name = i['git']['path']
-        # path = i['git']['owner']['login'] + \
-        #     "/" + i['git']['repository']['name'] + \
-        #     "/" + i['git']['branch'] + i['git']['path']
-        path = url_path_join(i['git']['owner']['login'], i['git']['repository']['name'], i['git']['branch'], i['git']['path'])
-        return [ name, path ]
