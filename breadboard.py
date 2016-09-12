@@ -8,30 +8,32 @@ import webbrowser
 import requests
 import mimetypes
 
+import json
+
 # todo make requests async
 
-class TaskmillCommand(sublime_plugin.TextCommand):
+class BreadboardCommand(sublime_plugin.TextCommand):
     _pythonVersion = sys.version_info[0]
 
     def init_panel(self):
         if not hasattr(self, 'output_view'):
-            self.output_view = self.window.create_output_panel("taskmill")
+            self.output_view = self.window.create_output_panel("breadboard")
 
     def run(self, edit):
         if not hasattr(self, 'config'):
-            self.config = sublime.load_settings('TaskMill.sublime-settings')
+            self.config = sublime.load_settings('breadboard.sublime-settings')
 
         self.window = self.view.window()
         self.edit = edit
 
         self.init_panel()
 
-        search_url = self.config.get("url") + "/script/search"
+        search_url = self.config.get("url") + "/script"
 
         req = requests.get(search_url, timeout=(2, 10))
 
         self.search_res = req.json()
-        self.choose = list(map(lambda i: [i['title'], i['html_url']], self.search_res))
+        self.choose = list(map(lambda i: [i['title'], i['run_url']], self.search_res))
 
         self.window.show_quick_panel(self.choose, self.on_done)
 
@@ -60,14 +62,19 @@ class TaskmillCommand(sublime_plugin.TextCommand):
             else:
                 txt = req.text
 
-                _type = req.headers.get('$type')
-                print(_type)
-                if _type == 'transform':
-                    self.view.run_command('insert', { 'characters' : txt })
-                else:
+                pragma = req.headers.get('manual-pragma')
+                if not pragma:
                     if '\n' in txt:
                         txt = '\n' + txt + '\n'
                     self.view.run_command('append', { 'characters' : txt })
+                else:
+                    pragma = json.loads(pragma)
+                    if "editor replace" in pragma:
+                        self.view.run_command('insert', { 'characters' : txt })
+                    else:
+                        if '\n' in txt:
+                            txt = '\n' + txt + '\n'
+                        self.view.run_command('append', { 'characters' : txt })
         
     def open(self, req):
         fileToOpen = self.normalizePath(self.saveInTempFile(req))
@@ -85,12 +92,7 @@ class TaskmillCommand(sublime_plugin.TextCommand):
         return fileToOpen
 
     def saveInTempFile(self, req):
-        #
-        # Create a temporary file to hold our contents
-        #
-        # if is_ST3():
         binary = req.encoding == None
-        # binary = True
 
         if binary:
             mode = 'wb'
@@ -98,7 +100,6 @@ class TaskmillCommand(sublime_plugin.TextCommand):
             mode = 'w'
 
         ext = mimetypes.guess_extension(req.headers.get('content-type'), strict=True);
-        print(ext);
         tempFile = tempfile.NamedTemporaryFile(suffix = ext, delete = False, mode = mode)
 
         with tempFile as fd:

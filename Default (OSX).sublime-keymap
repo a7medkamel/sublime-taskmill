@@ -1,5 +1,5 @@
 [
     {
-        "keys": ["super+shift+t"], "command": "taskmill"
+        "keys": ["super+alt+r"], "command": "breadboard"
     }
 ]
